@@ -56,4 +56,9 @@ def main():
         elif comma_delim:
             print(",".join(matches))
         else:
-            print("\n".
+            print("\n".join(matches))
+    else:
+        print(f"No matches found for plugin ID {plugin_id}.")
+
+if __name__ == "__main__":
+    main()
