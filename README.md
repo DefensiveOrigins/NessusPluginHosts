@@ -15,16 +15,20 @@ python NessusPluginHosts.py <filename.nessus> <plugin_id>
 
 also have option to not include port ```--no-port```
 
-## Example
+## useage examples 
+```
+# Default line-delimited
+python nessus_plugin_hosts.py scan.nessus 19506
 
-### Commandline 
-```
-python NessusPluginHosts.py internal_scan.nessus 19506
-```
+# Default line-delimited, no port
+python nessus_plugin_hosts.py scan.nessus 19506 --no-port
 
-### Output
-```
-10.0.0.5:22
-10.0.0.10:0
-192.168.1.25:80
+# Space-delimited
+python nessus_plugin_hosts.py scan.nessus 19506 --space-delim
+
+# Comma-delimited
+python nessus_plugin_hosts.py scan.nessus 19506 --comma-delim
+
+# Comma-delimited, no port
+python nessus_plugin_hosts.py scan.nessus 19506 --comma-delim --no-port
 ```
