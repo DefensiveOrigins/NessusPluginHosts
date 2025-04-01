@@ -32,3 +32,8 @@ python nessus_plugin_hosts.py scan.nessus 19506 --comma-delim
 # Comma-delimited, no port
 python nessus_plugin_hosts.py scan.nessus 19506 --comma-delim --no-port
 ```
+# List Identified Services
+Looks at the Nessus plugin 22964 and outputs the services by service type.
+```
+python IdentifiedServices.py scan.nessus --no-port --comma-delim
+```
