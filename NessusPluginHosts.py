@@ -1,8 +1,8 @@
 import sys
 import xml.etree.ElementTree as ET
 
-def parse_nessus_file(filename, plugin_id):
-    results = set()  # Use set to avoid duplicate IP:port entries
+def parse_nessus_file(filename, plugin_id, omit_ports=False):
+    results = set()
 
     try:
         tree = ET.parse(filename)
@@ -14,7 +14,10 @@ def parse_nessus_file(filename, plugin_id):
                 for item in host.findall("ReportItem"):
                     if item.attrib.get("pluginID") == plugin_id:
                         port = item.attrib.get("port", "0")
-                        results.add(f"{ip}:{port}")
+                        if omit_ports or port == "0":
+                            results.add(ip)
+                        else:
+                            results.add(f"{ip}:{port}")
 
         return sorted(results)
 
@@ -26,14 +29,15 @@ def parse_nessus_file(filename, plugin_id):
         sys.exit(1)
 
 def main():
-    if len(sys.argv) != 3:
-        print("Usage: python nessus_plugin_hosts.py <filename.nessus> <plugin_id>")
+    if len(sys.argv) < 3:
+        print("Usage: python nessus_plugin_hosts.py <filename.nessus> <plugin_id> [--no-port]")
         sys.exit(1)
 
     filename = sys.argv[1]
     plugin_id = sys.argv[2]
+    omit_ports = "--no-port" in sys.argv
 
-    matches = parse_nessus_file(filename, plugin_id)
+    matches = parse_nessus_file(filename, plugin_id, omit_ports)
 
     if matches:
         print("\n".join(matches))
