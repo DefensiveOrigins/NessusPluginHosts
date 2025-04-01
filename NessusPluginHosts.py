@@ -1,5 +1,14 @@
 import sys
 import xml.etree.ElementTree as ET
+import ipaddress
+
+def sort_key(entry):
+    """Sort by IP, then port if available."""
+    if ":" in entry:
+        ip, port = entry.split(":")
+        return (ipaddress.ip_address(ip), int(port))
+    else:
+        return (ipaddress.ip_address(entry), 0)
 
 def parse_nessus_file(filename, plugin_id, omit_ports=False):
     results = set()
@@ -19,7 +28,7 @@ def parse_nessus_file(filename, plugin_id, omit_ports=False):
                         else:
                             results.add(f"{ip}:{port}")
 
-        return sorted(results)
+        return sorted(results, key=sort_key)
 
     except ET.ParseError:
         print(f"Error: Could not parse {filename} as XML.")
