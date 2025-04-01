@@ -13,6 +13,8 @@ This is a Python script that parses a `.nessus` file (XML format from Tenable Ne
 python NessusPluginHosts.py <filename.nessus> <plugin_id>
 ```
 
+also have option to not include port ```--no-port```
+
 ## Example
 
 ### Commandline 
