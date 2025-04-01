@@ -3,7 +3,6 @@ import xml.etree.ElementTree as ET
 import ipaddress
 
 def sort_key(entry):
-    """Sort by IP, then port if available."""
     if ":" in entry:
         ip, port = entry.split(":")
         return (ipaddress.ip_address(ip), int(port))
@@ -39,19 +38,22 @@ def parse_nessus_file(filename, plugin_id, omit_ports=False):
 
 def main():
     if len(sys.argv) < 3:
-        print("Usage: python nessus_plugin_hosts.py <filename.nessus> <plugin_id> [--no-port]")
+        print("Usage: python nessus_plugin_hosts.py <filename.nessus> <plugin_id> [--no-port] [--space-delim | --comma-delim]")
         sys.exit(1)
 
     filename = sys.argv[1]
     plugin_id = sys.argv[2]
+
     omit_ports = "--no-port" in sys.argv
+    space_delim = "--space-delim" in sys.argv
+    comma_delim = "--comma-delim" in sys.argv
 
     matches = parse_nessus_file(filename, plugin_id, omit_ports)
 
     if matches:
-        print("\n".join(matches))
-    else:
-        print(f"No matches found for plugin ID {plugin_id}.")
-
-if __name__ == "__main__":
-    main()
+        if space_delim:
+            print(" ".join(matches))
+        elif comma_delim:
+            print(",".join(matches))
+        else:
+            print("\n".
