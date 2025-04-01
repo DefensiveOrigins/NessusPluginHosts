@@ -10,14 +10,14 @@ This is a Python script that parses a `.nessus` file (XML format from Tenable Ne
 ## 📦 Usage
 
 ```bash
-python nessus_plugin_hosts.py <filename.nessus> <plugin_id>
+python NessusPluginHosts.py <filename.nessus> <plugin_id>
 ```
 
 ## Example
 
 ### Commandline 
 ```
-python nessus_plugin_hosts.py internal_scan.nessus 19506
+python NessusPluginHosts.py internal_scan.nessus 19506
 ```
 
 ### Output
