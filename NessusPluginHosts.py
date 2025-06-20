@@ -2,15 +2,20 @@ import sys
 import xml.etree.ElementTree as ET
 import ipaddress
 
-def sort_key(entry):
-    if ":" in entry:
-        ip, port = entry.split(":")
-        return (ipaddress.ip_address(ip), int(port))
-    else:
-        return (ipaddress.ip_address(entry), 0)
+def is_ip(entry):
+    try:
+        ipaddress.ip_address(entry.split(":")[0])
+        return True
+    except ValueError:
+        return False
+
+def sort_key_ip(entry):
+    ip_part, port_part = (entry.split(":") + ["0"])[:2]
+    return (ipaddress.ip_address(ip_part), int(port_part))
 
 def parse_nessus_file(filename, plugin_id, omit_ports=False):
-    results = set()
+    ip_results = set()
+    host_results = set()
 
     try:
         tree = ET.parse(filename)
@@ -18,16 +23,24 @@ def parse_nessus_file(filename, plugin_id, omit_ports=False):
 
         for report in root.findall(".//Report"):
             for host in report.findall("ReportHost"):
-                ip = host.attrib.get("name", "")
+                name = host.attrib.get("name", "")
                 for item in host.findall("ReportItem"):
                     if item.attrib.get("pluginID") == plugin_id:
                         port = item.attrib.get("port", "0")
                         if omit_ports or port == "0":
-                            results.add(ip)
+                            entry = name
                         else:
-                            results.add(f"{ip}:{port}")
+                            entry = f"{name}:{port}"
 
-        return sorted(results, key=sort_key)
+                        if is_ip(entry):
+                            ip_results.add(entry)
+                        else:
+                            host_results.add(entry)
+
+        sorted_ips = sorted(ip_results, key=sort_key_ip)
+        sorted_hosts = sorted(host_results)
+
+        return sorted_ips + sorted_hosts
 
     except ET.ParseError:
         print(f"Error: Could not parse {filename} as XML.")
