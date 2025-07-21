@@ -32,6 +32,10 @@ python nessus_plugin_hosts.py scan.nessus 19506 --no-port
 # Space-delimited
 python nessus_plugin_hosts.py scan.nessus 19506 --space-delim
 
+
+# Space-delimited, no-port -- Specfication for metasploit "rhosts"
+python nessus_plugin_hosts.py scan.nessus 19506 --space-delim --no-port
+
 # Comma-delimited
 python nessus_plugin_hosts.py scan.nessus 19506 --comma-delim
 
