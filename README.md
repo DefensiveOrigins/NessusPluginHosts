@@ -14,7 +14,9 @@ python NessusPluginHosts.py <filename.nessus> <plugin_id>
 
 python IdentifiedServices <filename.nessus>
 
-python FindingCount.py <filename.nessus>
+python FindingCount.py -f <filename.nessus>
+python FindingCount.py -d <directory of nessus files>
+python FindingCount.py -d <directory of nessus files> --csv summary.csv
 ```
 
 also have option to not include port ```--no-port```
@@ -45,6 +47,8 @@ python IdentifiedServices.py scan.nessus --no-port --comma-delim
 # Count finidngs 
 Looks at the Nessus file and counts both unique and total findings 
 ```
-python FindingCount.py <filename.nessus>
+python FindingCount.py -f <filename.nessus>
+python FindingCount.py -d <directory of nessus files>
+python FindingCount.py -d <directory of nessus files> --csv summary.csv
 ```
 
