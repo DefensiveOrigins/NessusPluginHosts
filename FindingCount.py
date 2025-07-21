@@ -1,26 +1,21 @@
+import os
 import sys
+import argparse
 import xml.etree.ElementTree as ET
 from collections import defaultdict
+from tabulate import tabulate
 
 def parse_nessus(file_path):
+    live_hosts = set()
+    unique_findings = defaultdict(set)
+    total_findings = defaultdict(int)
+
     try:
         tree = ET.parse(file_path)
         root = tree.getroot()
     except Exception as e:
-        print(f"Error reading Nessus file: {e}")
-        return
-
-    severity_names = {
-        "0": "Info",
-        "1": "Low",
-        "2": "Medium",
-        "3": "High",
-        "4": "Critical"
-    }
-
-    live_hosts = set()
-    unique_findings = defaultdict(set)
-    total_findings = defaultdict(int)
+        print(f"Error reading {file_path}: {e}")
+        return None
 
     for report in root.findall(".//Report"):
         for host in report.findall("ReportHost"):
@@ -30,34 +25,60 @@ def parse_nessus(file_path):
             for item in host.findall("ReportItem"):
                 severity = item.attrib.get("severity", "0")
                 plugin_id = item.attrib.get("pluginID", "unknown")
-                key = f"{plugin_id}"
-
-                # Track total and unique
                 total_findings[severity] += 1
-                unique_findings[severity].add(key)
+                unique_findings[severity].add(plugin_id)
 
-    print(f"\nSummary for: {file_path}")
-    print(f"Total Live Hosts: {len(live_hosts)}")
+    result = {
+        "File": os.path.basename(file_path),
+        "👥Hosts": len(live_hosts),
+        "🔴Uni": len(unique_findings["4"]),
+        "🟠Uni": len(unique_findings["3"]),
+        "🟡Uni": len(unique_findings["2"]),
+        "🔵Uni": len(unique_findings["1"]),
+        "⚪Uni": len(unique_findings["0"]),
+        "📌UniTot": sum(len(v) for v in unique_findings.values()),
+        "🔴Tot": total_findings["4"],
+        "🟠Tot": total_findings["3"],
+        "🟡Tot": total_findings["2"],
+        "🔵Tot": total_findings["1"],
+        "⚪Tot": total_findings["0"],
+        "🧮Tot": sum(total_findings.values())
+    }
 
-    total_unique = sum(len(v) for v in unique_findings.values())
-    total_total = sum(total_findings.values())
+    return result
 
-    print("\nUnique Findings per Severity:")
-    for sev in sorted(severity_names.keys(), key=int, reverse=True):
-        print(f"  {severity_names[sev]}: {len(unique_findings[sev])}")
+def process_directory(directory_path):
+    summaries = []
+    for filename in os.listdir(directory_path):
+        if filename.endswith(".nessus"):
+            full_path = os.path.join(directory_path, filename)
+            result = parse_nessus(full_path)
+            if result:
+                summaries.append(result)
 
-    print(f"  TOTAL: {total_unique}")
+    if not summaries:
+        print("No valid .nessus files found in directory.")
+        return
 
-    print("\nTotal Findings per Severity:")
-    for sev in sorted(severity_names.keys(), key=int, reverse=True):
-        print(f"  {severity_names[sev]}: {total_findings[sev]}")
+    headers = summaries[0].keys()
+    table = [list(summary.values()) for summary in summaries]
+    print(tabulate(table, headers=headers, tablefmt="grid"))
 
-    print(f"  TOTAL: {total_total}")
+def main():
+    parser = argparse.ArgumentParser(description="Summarize Nessus .nessus files.")
+    group = parser.add_mutually_exclusive_group(required=True)
+    group.add_argument("-f", "--file", help="Path to a single .nessus file")
+    group.add_argument("-d", "--directory", help="Path to directory containing .nessus files")
+    args = parser.parse_args()
+
+    if args.directory:
+        process_directory(args.directory)
+    elif args.file:
+        result = parse_nessus(args.file)
+        if result:
+            print(f"\nSummary for: {args.file}")
+            for k, v in result.items():
+                print(f"{k}: {v}")
 
 if __name__ == "__main__":
-    if len(sys.argv) != 2:
-        print("Usage: python nessus_summary.py <file.nessus>")
-        sys.exit(1)
-
-    nessus_file = sys.argv[1]
-    parse_nessus(nessus_file)
+    main()
