@@ -32,18 +32,18 @@ def parse_nessus(file_path):
     result = {
         "File": os.path.basename(file_path),
         "👥 Hosts": len(live_hosts),
-        "Critical 🔴 Uni": len(unique_findings["4"]),
-        "High 🟠 Uni": len(unique_findings["3"]),
-        "Medium 🟡 Uni": len(unique_findings["2"]),
+        "Crt 🔴 Uni": len(unique_findings["4"]),
+        "Hgh 🟠 Uni": len(unique_findings["3"]),
+        "Med 🟡 Uni": len(unique_findings["2"]),
         "Low 🔵 Uni": len(unique_findings["1"]),
-        "Info ⚪ Uni": len(unique_findings["0"]),
-        "📌 Unique Total": sum(len(v) for v in unique_findings.values()),
-        "Critical 🔴 Tot": total_findings["4"],
-        "High 🟠 Tot": total_findings["3"],
-        "Medium 🟡 Tot": total_findings["2"],
+        "Inf ⚪ Uni": len(unique_findings["0"]),
+        "📌 Unq TTL": sum(len(v) for v in unique_findings.values()),
+        "Crt 🔴 Tot": total_findings["4"],
+        "Hgh 🟠 Tot": total_findings["3"],
+        "Med 🟡 Tot": total_findings["2"],
         "Low 🔵 Tot": total_findings["1"],
-        "Info ⚪ Tot": total_findings["0"],
-        "🧮 Total Findings": sum(total_findings.values())
+        "Inf ⚪ Tot": total_findings["0"],
+        "🧮 TTL ": sum(total_findings.values())
     }
 
     return result
