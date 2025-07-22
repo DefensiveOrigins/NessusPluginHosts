@@ -50,7 +50,7 @@ Looks at the Nessus plugin 22964 and outputs the services by service type.
 python IdentifiedServices.py scan.nessus --no-port --comma-delim
 ```
 
-# Count finidngs 
+# Count Unqiue/Total Findngs 
 Looks at the Nessus file and counts both unique and total findings 
 ```
 # database selection
