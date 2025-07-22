@@ -17,6 +17,8 @@ python IdentifiedServices <filename.nessus>
 python FindingCount.py -f <filename.nessus>
 python FindingCount.py -d <directory of nessus files>
 python FindingCount.py -d <directory of nessus files> --csv summary.csv
+python FindingCount.py -f <filename.nessus> --unique/--total/--both
+
 ```
 
 also have option to not include port ```--no-port```
@@ -51,8 +53,17 @@ python IdentifiedServices.py scan.nessus --no-port --comma-delim
 # Count finidngs 
 Looks at the Nessus file and counts both unique and total findings 
 ```
+# database selection
 python FindingCount.py -f <filename.nessus>
 python FindingCount.py -d <directory of nessus files>
+
+# Option to return unique findings, total findings, or both
+python FindingCount.py -f <filename.nessus> --unique
+python FindingCount.py -f <filename.nessus> --total
+python FindingCount.py -f <filename.nessus> --both
+
+#export to CSV
 python FindingCount.py -d <directory of nessus files> --csv summary.csv
+
 ```
 
