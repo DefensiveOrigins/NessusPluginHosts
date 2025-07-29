@@ -1,6 +1,8 @@
 import sys
+import os
 import xml.etree.ElementTree as ET
 import ipaddress
+import argparse
 
 def is_ip(entry):
     try:
@@ -44,34 +46,51 @@ def parse_nessus_file(filename, plugin_id, omit_ports=False):
 
     except ET.ParseError:
         print(f"Error: Could not parse {filename} as XML.")
-        sys.exit(1)
+        return []
     except FileNotFoundError:
         print(f"Error: File {filename} not found.")
-        sys.exit(1)
+        return []
 
 def main():
-    if len(sys.argv) < 3:
-        print("Usage: python nessus_plugin_hosts.py <filename.nessus> <plugin_id> [--no-port] [--space-delim | --comma-delim]")
-        sys.exit(1)
+    parser = argparse.ArgumentParser(description="Parse .nessus file(s) for a specific plugin ID.")
+    parser.add_argument("plugin_id", help="Plugin ID to search for")
+    parser.add_argument("-f", "--file", help="Path to a single .nessus file")
+    parser.add_argument("-d", "--directory", help="Path to a directory of .nessus files")
+    parser.add_argument("--no-port", action="store_true", help="Omit port from results")
+    parser.add_argument("--space-delim", action="store_true", help="Output space-delimited")
+    parser.add_argument("--comma-delim", action="store_true", help="Output comma-delimited")
 
-    filename = sys.argv[1]
-    plugin_id = sys.argv[2]
+    args = parser.parse_args()
 
-    omit_ports = "--no-port" in sys.argv
-    space_delim = "--space-delim" in sys.argv
-    comma_delim = "--comma-delim" in sys.argv
+    if not args.file and not args.directory:
+        parser.error("Either --file or --directory must be specified.")
 
-    matches = parse_nessus_file(filename, plugin_id, omit_ports)
+    file_list = []
+    if args.directory:
+        for fname in os.listdir(args.directory):
+            if fname.endswith(".nessus"):
+                file_list.append(os.path.join(args.directory, fname))
+        if not file_list:
+            print(f"No .nessus files found in directory {args.directory}.")
+            sys.exit(1)
+    elif args.file:
+        file_list = [args.file]
 
-    if matches:
-        if space_delim:
-            print(" ".join(matches))
-        elif comma_delim:
-            print(",".join(matches))
+    for file in file_list:
+        matches = parse_nessus_file(file, args.plugin_id, args.no_port)
+
+        if args.directory:
+            print(f"\n===== Results from {os.path.basename(file)} =====")
+
+        if matches:
+            if args.space_delim:
+                print(" ".join(matches))
+            elif args.comma_delim:
+                print(",".join(matches))
+            else:
+                print("\n".join(matches))
         else:
-            print("\n".join(matches))
-    else:
-        print(f"No matches found for plugin ID {plugin_id}.")
+            print(f"No matches found for plugin ID {args.plugin_id}.")
 
 if __name__ == "__main__":
     main()
