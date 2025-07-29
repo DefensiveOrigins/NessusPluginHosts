@@ -31,50 +31,53 @@ def parse_nessus(file_path):
 
     return {
         "File": os.path.basename(file_path),
-        "👥 Hosts": len(live_hosts),
-        "Critical 🔴 Uni": len(unique_findings["4"]),
-        "High 🟠 Uni": len(unique_findings["3"]),
-        "Medium 🟡 Uni": len(unique_findings["2"]),
-        "Low 🔵 Uni": len(unique_findings["1"]),
-        "Info ⚪ Uni": len(unique_findings["0"]),
-        "📌 Unique Total": sum(len(v) for v in unique_findings.values()),
-        "Critical 🔴 Tot": total_findings["4"],
-        "High 🟠 Tot": total_findings["3"],
-        "Medium 🟡 Tot": total_findings["2"],
-        "Low 🔵 Tot": total_findings["1"],
-        "Info ⚪ Tot": total_findings["0"],
-        "🧮 Total Findings": sum(total_findings.values())
+        "Hosts": len(live_hosts),
+        "Critical Unique": len(unique_findings["4"]),
+        "High Unique": len(unique_findings["3"]),
+        "Medium Unique": len(unique_findings["2"]),
+        "Low Unique": len(unique_findings["1"]),
+        "Info Unique": len(unique_findings["0"]),
+        "Unique Total": sum(len(v) for v in unique_findings.values()),
+        "Critical Total": total_findings["4"],
+        "High Total": total_findings["3"],
+        "Medium Total": total_findings["2"],
+        "Low Total": total_findings["1"],
+        "Info Total": total_findings["0"],
+        "Total Findings": sum(total_findings.values())
     }
 
-def format_output(results, include_unique=True, include_total=True):
+def build_output_rows(results, include_unique=True, include_total=True):
     output_rows = []
 
     for res in results:
         if include_unique:
             output_rows.append({
                 "File": res["File"],
-                "👥 Hosts": res["👥 Hosts"],
+                "Hosts": res["Hosts"],
                 "Type": "Unique",
-                "Critical 🔴": res["Critical 🔴 Uni"],
-                "High 🟠": res["High 🟠 Uni"],
-                "Medium 🟡": res["Medium 🟡 Uni"],
-                "Low 🔵": res["Low 🔵 Uni"],
-                "Info ⚪": res["Info ⚪ Uni"],
-                "📌 Total": res["📌 Unique Total"]
+                "Critical": res["Critical Unique"],
+                "High": res["High Unique"],
+                "Medium": res["Medium Unique"],
+                "Low": res["Low Unique"],
+                "Info": res["Info Unique"],
+                "Total": res["Unique Total"]
             })
         if include_total:
             output_rows.append({
                 "File": res["File"],
-                "👥 Hosts": res["👥 Hosts"],
+                "Hosts": res["Hosts"],
                 "Type": "Total",
-                "Critical 🔴": res["Critical 🔴 Tot"],
-                "High 🟠": res["High 🟠 Tot"],
-                "Medium 🟡": res["Medium 🟡 Tot"],
-                "Low 🔵": res["Low 🔵 Tot"],
-                "Info ⚪": res["Info ⚪ Tot"],
-                "📌 Total": res["🧮 Total Findings"]
+                "Critical": res["Critical Total"],
+                "High": res["High Total"],
+                "Medium": res["Medium Total"],
+                "Low": res["Low Total"],
+                "Info": res["Info Total"],
+                "Total": res["Total Findings"]
             })
+    return output_rows
 
+def format_output(results, include_unique=True, include_total=True):
+    output_rows = build_output_rows(results, include_unique, include_total)
     if output_rows:
         headers = output_rows[0].keys()
         table = [list(row.values()) for row in output_rows]
@@ -96,12 +99,13 @@ def process_directory(directory_path, include_unique=True, include_total=True, c
     format_output(summaries, include_unique=include_unique, include_total=include_total)
 
     if csv_output:
+        output_rows = build_output_rows(summaries, include_unique=include_unique, include_total=include_total)
         try:
             with open(csv_output, "w", newline="", encoding="utf-8") as f:
-                writer = csv.DictWriter(f, fieldnames=summaries[0].keys())
+                writer = csv.DictWriter(f, fieldnames=output_rows[0].keys())
                 writer.writeheader()
-                for summary in summaries:
-                    writer.writerow(summary)
+                for row in output_rows:
+                    writer.writerow(row)
             print(f"\n✅ CSV exported to: {csv_output}")
         except Exception as e:
             print(f"❌ Error writing CSV: {e}")
