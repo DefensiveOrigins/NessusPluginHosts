@@ -10,9 +10,9 @@ This is a Python script that parses a `.nessus` file (XML format from Tenable Ne
 ## 📦 Usage
 
 ```bash
-python NessusPluginHosts.py <filename.nessus> <plugin_id>
+python NessusPluginHosts.py -f <filename.nessus> <plugin_id>
 
-python IdentifiedServices <filename.nessus>
+python IdentifiedServices -f <filename.nessus>
 
 python FindingCount.py -f <filename.nessus>
 python FindingCount.py -d <directory of nessus files>
