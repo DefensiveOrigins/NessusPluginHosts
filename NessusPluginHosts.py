@@ -4,6 +4,13 @@ import xml.etree.ElementTree as ET
 import ipaddress
 import argparse
 from pathlib import Path
+from collections import defaultdict
+
+SEV_LABELS = ("Info", "Low", "Medium", "High", "Critical")
+RISK_TO_SEV = {
+    "none": 0, "informational": 0, "info": 0,
+    "low": 1, "medium": 2, "high": 3, "critical": 4,
+}
 
 def is_ip(entry):
     try:
@@ -17,27 +24,14 @@ def sort_key_ip(entry):
     return (ipaddress.ip_address(ip_part), int(port_part))
 
 def severity_label_from_int(sev_int):
-    mapping = {
-        0: "Info",
-        1: "Low",
-        2: "Medium",
-        3: "High",
-        4: "Critical",
-    }
-    return mapping.get(sev_int, "Unknown")
+    if 0 <= sev_int < len(SEV_LABELS):
+        return SEV_LABELS[sev_int]
+    return "Unknown"
 
 def severity_int_from_risk_factor(risk_text):
     if not risk_text:
         return None
-    t = risk_text.strip().lower()
-    mapping = {
-        "none": 0, "informational": 0, "info": 0,
-        "low": 1,
-        "medium": 2,
-        "high": 3,
-        "critical": 4,
-    }
-    return mapping.get(t)
+    return RISK_TO_SEV.get(risk_text.strip().lower())
 
 def sanitize_filename(name: str, max_len: int = 80) -> str:
     safe = "".join(c if (c.isalnum() or c in "-_ .") else "_" for c in (name or "").strip())
@@ -49,6 +43,7 @@ def sanitize_filename(name: str, max_len: int = 80) -> str:
     return safe
 
 def parse_nessus_file(filename, plugin_id, omit_ports=False):
+    """Original single-plugin host listing (kept for backward compatibility)."""
     ip_results = set()
     host_results = set()
     try:
@@ -60,14 +55,8 @@ def parse_nessus_file(filename, plugin_id, omit_ports=False):
                 for item in host.findall("ReportItem"):
                     if item.attrib.get("pluginID") == plugin_id:
                         port = item.attrib.get("port", "0")
-                        if omit_ports or port == "0":
-                            entry = name
-                        else:
-                            entry = f"{name}:{port}"
-                        if is_ip(entry):
-                            ip_results.add(entry)
-                        else:
-                            host_results.add(entry)
+                        entry = name if (omit_ports or port == "0") else f"{name}:{port}"
+                        (ip_results if is_ip(entry) else host_results).add(entry)
         sorted_ips = sorted(ip_results, key=sort_key_ip)
         sorted_hosts = sorted(host_results)
         return sorted_ips + sorted_hosts
@@ -78,57 +67,84 @@ def parse_nessus_file(filename, plugin_id, omit_ports=False):
         print(f"Error: File {filename} not found.")
         return []
 
-def collect_plugins_from_nessus(filename):
+def build_index_stream(filename, include_ports=True):
+    """
+    Single-pass streaming index:
+      - plugins: pid -> {name, severity_int, severity_label}
+      - plugin_hosts: pid -> set(host entries)
+    """
     plugins = {}
+    plugin_hosts = defaultdict(set)
+    current_host = ""
+
     try:
-        tree = ET.parse(filename)
-        root = tree.getroot()
-        for report in root.findall(".//Report"):
-            for host in report.findall("ReportHost"):
-                for item in host.findall("ReportItem"):
-                    pid = item.attrib.get("pluginID")
-                    if not pid:
-                        continue
-                    sev_attr = item.attrib.get("severity")
-                    sev_int = int(sev_attr) if (sev_attr and sev_attr.isdigit()) else None
-                    if sev_int is None:
-                        rf_elem = item.find("risk_factor")
-                        sev_int = severity_int_from_risk_factor(rf_elem.text if rf_elem is not None else None)
+        for event, elem in ET.iterparse(filename, events=("start", "end")):
+            tag = elem.tag
+
+            if event == "start" and tag == "ReportHost":
+                current_host = elem.attrib.get("name", "")
+
+            elif event == "end" and tag == "ReportItem":
+                pid = elem.attrib.get("pluginID")
+                if not pid:
+                    elem.clear(); continue
+
+                # Severity
+                sev_attr = elem.attrib.get("severity")
+                if sev_attr and sev_attr.isdigit():
+                    sev_int = int(sev_attr)
+                else:
+                    rf_text = elem.findtext("risk_factor", default="info")
+                    sev_int = severity_int_from_risk_factor(rf_text)
                     if sev_int is None:
                         sev_int = 0
-                    pname = (item.attrib.get("pluginName") or "").strip()
-                    current = plugins.get(pid)
-                    if current is None:
-                        plugins[pid] = {
-                            "name": pname,
-                            "severity_int": sev_int,
-                            "severity_label": severity_label_from_int(sev_int),
-                        }
-                    else:
-                        if sev_int > current["severity_int"]:
-                            current["severity_int"] = sev_int
-                            current["severity_label"] = severity_label_from_int(sev_int)
-                        if not current["name"] and pname:
-                            current["name"] = pname
-        return plugins
+
+                # Plugin name & highest severity
+                pname = (elem.attrib.get("pluginName") or "").strip()
+                existing = plugins.get(pid)
+                if (existing is None) or (sev_int > existing["severity_int"]):
+                    plugins[pid] = {
+                        "name": pname,
+                        "severity_int": sev_int,
+                        "severity_label": severity_label_from_int(sev_int),
+                    }
+                elif existing and not existing["name"] and pname:
+                    existing["name"] = pname  # fill name if previously blank
+
+                # Host entry
+                port = elem.attrib.get("port", "0")
+                entry = current_host if (not include_ports or port == "0") else f"{current_host}:{port}"
+                plugin_hosts[pid].add(entry)
+
+                elem.clear()
+
+            elif event == "end" and tag == "ReportHost":
+                elem.clear()
+                current_host = ""
+
+        return plugins, plugin_hosts
+
     except ET.ParseError:
         print(f"Error: Could not parse {filename} as XML.")
-        return {}
+        return {}, defaultdict(set)
     except FileNotFoundError:
         print(f"Error: File {filename} not found.")
-        return {}
+        return {}, defaultdict(set)
 
 def write_lines(path: Path, lines, space=False, comma=False):
     path.parent.mkdir(parents=True, exist_ok=True)
     if not lines:
         return False
+    # Respect delimiter flags; default is one per line
     if space:
         text = " ".join(lines) + "\n"
+        path.write_text(text, encoding="utf-8")
     elif comma:
         text = ",".join(lines) + "\n"
+        path.write_text(text, encoding="utf-8")
     else:
-        text = "\n".join(lines) + "\n"
-    path.write_text(text, encoding="utf-8")
+        with path.open("w", encoding="utf-8") as fh:
+            fh.writelines(l + "\n" for l in lines)
     return True
 
 def main():
@@ -139,8 +155,9 @@ def main():
     parser.add_argument("-f", "--file", help="Path to a single .nessus file")
     parser.add_argument("-d", "--directory", help="Path to a directory of .nessus files")
     parser.add_argument("--no-port", action="store_true", help="Omit port from results / exports")
-    parser.add_argument("--space-delim", action="store_true", help="Output space-delimited (host results mode / exports)")
-    parser.add_argument("--comma-delim", action="store_true", help="Output comma-delimited (host results mode / exports)")
+    group = parser.add_mutually_exclusive_group()
+    group.add_argument("--space-delim", action="store_true", help="Output space-delimited (host results mode / exports)")
+    group.add_argument("--comma-delim", action="store_true", help="Output comma-delimited (host results mode / exports)")
     parser.add_argument(
         "--list-plugins",
         nargs="?", type=int, const=-1, metavar="SEVERITY",
@@ -166,27 +183,35 @@ def main():
     if not in_list_mode and not in_export_mode and not args.plugin_id:
         parser.error("Provide a plugin_id, or use --list-plugins, or --export-plugin-hosts with --list-plugins.")
 
+    # Build list of files
     file_list = []
     if args.directory:
-        for fname in os.listdir(args.directory):
-            if fname.endswith(".nessus"):
-                file_list.append(os.path.join(args.directory, fname))
+        # Use scandir for efficiency
+        with os.scandir(args.directory) as it:
+            for entry in it:
+                if entry.is_file() and entry.name.endswith(".nessus"):
+                    file_list.append(entry.path)
         if not file_list:
             print(f"No .nessus files found in directory {args.directory}.")
             sys.exit(1)
     elif args.file:
         file_list = [args.file]
 
+    # List-plugins mode (with or without export) -> single-pass stream per file
     if in_list_mode:
         target_sev = None if args.list_plugins == -1 else args.list_plugins
         for file in file_list:
-            plugins = collect_plugins_from_nessus(file)
+            plugins, plugin_hosts = build_index_stream(file, include_ports=(not args.no_port))
+
             if args.directory and not in_export_mode:
                 print(f"\n===== Plugins in {os.path.basename(file)} =====")
+
             if not plugins:
                 if not in_export_mode:
                     print("No plugins with findings found.")
                 continue
+
+            # sort: severity desc, then numeric plugin id asc
             def sort_key(item):
                 pid, meta = item
                 try:
@@ -194,19 +219,31 @@ def main():
                 except ValueError:
                     pid_int = float("inf")
                 return (-meta["severity_int"], pid_int)
+
+            # If exporting, prepare base path
             if in_export_mode:
                 base = Path(args.export_plugin_hosts)
                 scan_name = Path(file).stem
                 base_scan = base / sanitize_filename(scan_name)
+
             for pid, meta in sorted(plugins.items(), key=sort_key):
                 if target_sev is not None and meta["severity_int"] != target_sev:
                     continue
+
                 if in_export_mode:
                     sev_dir = base_scan / f"{meta['severity_int']}_{meta['severity_label']}"
                     fname = f"{pid}_{sanitize_filename(meta['name'])}.txt"
                     out_path = sev_dir / fname
-                    matches = parse_nessus_file(file, pid, args.no_port)
-                    written = write_lines(out_path, matches, space=args.space_delim, comma=args.comma_delim)
+
+                    # Use pre-built host set; sort for stable output
+                    hosts = plugin_hosts.get(pid, set())
+                    ip_list = [h for h in hosts if is_ip(h)]
+                    host_list = [h for h in hosts if not is_ip(h)]
+                    ip_list_sorted = sorted(ip_list, key=sort_key_ip)
+                    host_list_sorted = sorted(host_list)
+                    ordered = ip_list_sorted + host_list_sorted
+
+                    written = write_lines(out_path, ordered, space=args.space_delim, comma=args.comma_delim)
                     if written:
                         print(f"Wrote {out_path}")
                 else:
@@ -214,13 +251,17 @@ def main():
                     print(f"{pid},{meta['severity_int']},{meta['severity_label']},{name}")
         return
 
+    # Export mode alone is not allowed; require --list-plugins
     if in_export_mode and not in_list_mode:
         parser.error("--export-plugin-hosts must be used with --list-plugins.")
 
+    # Original single-plugin host/port results mode
     for file in file_list:
         matches = parse_nessus_file(file, args.plugin_id, args.no_port)
+
         if args.directory:
             print(f"\n===== Results from {os.path.basename(file)} =====")
+
         if matches:
             if args.space_delim:
                 print(" ".join(matches))
