@@ -123,6 +123,17 @@ def main():
     earliest_start = None
     latest_end = None
 
+    # Collect .nessus files
+    search_dir = os.path.abspath(args.directory)
+    files = sorted(glob.glob(os.path.join(search_dir, "*.nessus")))
+    if not files:
+        print(f"No .nessus files found in: {search_dir}", file=sys.stderr)
+        sys.exit(1)
+
+    # Initial script start message
+    print(f"[+] Starting merge process...")
+    print(f"[+] Found {len(files)} .nessus file(s) in: {search_dir}")
+
     with alive_bar(len(files), title="Merging Nessus files") as bar:
         for idx, fpath in enumerate(files, start=1):
             try:
