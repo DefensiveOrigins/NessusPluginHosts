@@ -7,10 +7,6 @@ from pathlib import Path
 from collections import defaultdict
 
 SEV_LABELS = ("Info", "Low", "Medium", "High", "Critical")
-RISK_TO_SEV = {
-    "none": 0, "informational": 0, "info": 0,
-    "low": 1, "medium": 2, "high": 3, "critical": 4,
-}
 
 def is_ip(entry):
     try:
@@ -28,10 +24,29 @@ def severity_label_from_int(sev_int):
         return SEV_LABELS[sev_int]
     return "Unknown"
 
-def severity_int_from_risk_factor(risk_text):
-    if not risk_text:
-        return None
-    return RISK_TO_SEV.get(risk_text.strip().lower())
+def cvss3_to_sev(cvss3):
+    """
+    Map CVSS v3 base score to severity buckets:
+      0.0                -> 0 Info
+      0.1 - 3.9          -> 1 Low
+      4.0 - 6.9          -> 2 Medium
+      7.0 - 8.9          -> 3 High
+      9.0 - 10.0         -> 4 Critical
+    """
+    try:
+        s = float(cvss3)
+    except (TypeError, ValueError):
+        return 0  # Default to Info if score missing or unparsable
+    if s == 0.0:
+        return 0
+    if 0.0 < s <= 3.9:
+        return 1
+    if 4.0 <= s <= 6.9:
+        return 2
+    if 7.0 <= s <= 8.9:
+        return 3
+    # Clamp any value >= 9.0 to Critical (handles 10.0 and any oddities)
+    return 4
 
 def sanitize_filename(name: str, max_len: int = 80) -> str:
     safe = "".join(c if (c.isalnum() or c in "-_ .") else "_" for c in (name or "").strip())
@@ -72,6 +87,7 @@ def build_index_stream(filename, include_ports=True):
     Single-pass streaming index:
       - plugins: pid -> {name, severity_int, severity_label}
       - plugin_hosts: pid -> set(host entries)
+    Severity is derived EXCLUSIVELY from <cvss3_base_score>.
     """
     plugins = {}
     plugin_hosts = defaultdict(set)
@@ -89,15 +105,9 @@ def build_index_stream(filename, include_ports=True):
                 if not pid:
                     elem.clear(); continue
 
-                # Severity
-                sev_attr = elem.attrib.get("severity")
-                if sev_attr and sev_attr.isdigit():
-                    sev_int = int(sev_attr)
-                else:
-                    rf_text = elem.findtext("risk_factor", default="info")
-                    sev_int = severity_int_from_risk_factor(rf_text)
-                    if sev_int is None:
-                        sev_int = 0
+                # Severity derived ONLY from CVSS v3 base score
+                cvss3 = elem.findtext("cvss3_base_score")
+                sev_int = cvss3_to_sev(cvss3)
 
                 # Plugin name & highest severity
                 pname = (elem.attrib.get("pluginName") or "").strip()
@@ -186,7 +196,6 @@ def main():
     # Build list of files
     file_list = []
     if args.directory:
-        # Use scandir for efficiency
         with os.scandir(args.directory) as it:
             for entry in it:
                 if entry.is_file() and entry.name.endswith(".nessus"):
