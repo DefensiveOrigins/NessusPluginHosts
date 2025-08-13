@@ -24,9 +24,9 @@ def severity_label_from_int(sev_int):
         return SEV_LABELS[sev_int]
     return "Unknown"
 
-def cvss3_to_sev(cvss3):
+def cvss_to_sev(cvss_score):
     """
-    Map CVSS v3 base score to severity buckets:
+    Map CVSS base score (v3 preferred, v2 fallback) to severity buckets:
       0.0                -> 0 Info
       0.1 - 3.9          -> 1 Low
       4.0 - 6.9          -> 2 Medium
@@ -34,7 +34,7 @@ def cvss3_to_sev(cvss3):
       9.0 - 10.0         -> 4 Critical
     """
     try:
-        s = float(cvss3)
+        s = float(cvss_score)
     except (TypeError, ValueError):
         return 0  # Default to Info if score missing or unparsable
     if s == 0.0:
@@ -45,8 +45,7 @@ def cvss3_to_sev(cvss3):
         return 2
     if 7.0 <= s <= 8.9:
         return 3
-    # Clamp any value >= 9.0 to Critical (handles 10.0 and any oddities)
-    return 4
+    return 4  # >= 9.0
 
 def sanitize_filename(name: str, max_len: int = 80) -> str:
     safe = "".join(c if (c.isalnum() or c in "-_ .") else "_" for c in (name or "").strip())
@@ -87,7 +86,7 @@ def build_index_stream(filename, include_ports=True):
     Single-pass streaming index:
       - plugins: pid -> {name, severity_int, severity_label}
       - plugin_hosts: pid -> set(host entries)
-    Severity is derived EXCLUSIVELY from <cvss3_base_score>.
+    Severity is derived from <cvss3_base_score>, falling back to <cvss_base_score> when missing.
     """
     plugins = {}
     plugin_hosts = defaultdict(set)
@@ -103,11 +102,14 @@ def build_index_stream(filename, include_ports=True):
             elif event == "end" and tag == "ReportItem":
                 pid = elem.attrib.get("pluginID")
                 if not pid:
-                    elem.clear(); continue
+                    elem.clear()
+                    continue
 
-                # Severity derived ONLY from CVSS v3 base score
-                cvss3 = elem.findtext("cvss3_base_score")
-                sev_int = cvss3_to_sev(cvss3)
+                # Severity: prefer CVSS v3; fallback to CVSS v2
+                cvss = elem.findtext("cvss3_base_score")
+                if not cvss:
+                    cvss = elem.findtext("cvss_base_score")
+                sev_int = cvss_to_sev(cvss)
 
                 # Plugin name & highest severity
                 pname = (elem.attrib.get("pluginName") or "").strip()
@@ -145,7 +147,6 @@ def write_lines(path: Path, lines, space=False, comma=False):
     path.parent.mkdir(parents=True, exist_ok=True)
     if not lines:
         return False
-    # Respect delimiter flags; default is one per line
     if space:
         text = " ".join(lines) + "\n"
         path.write_text(text, encoding="utf-8")
