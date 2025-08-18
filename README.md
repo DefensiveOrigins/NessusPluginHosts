@@ -34,7 +34,7 @@ python FindingCount.py -f <filename.nessus> --unique/--total/--both
 ### NessusPluginHosts.py (List Hosts/Services per Plugin)
 
  
-```
+```bash
 # Default line-delimited
 python NessusPluginHosts.py scan.nessus 19506
 
@@ -64,7 +64,7 @@ python IdentifiedServices.py scan.nessus --no-port --comma-delim
 
 ### MergeNessus.py (Merge Nessus Files)
 
-```
+```bash
 # Merges all nessus files in current folder, outputs to "Merged.Nesssus"
 python3 MergeNessus.py
 
@@ -81,11 +81,13 @@ python3 MergeNessus.py -t "Quarterly Security Scan"
 python3 MergeNessus.py -d /scans/q1 -o ./Merged_Q1.nessus -t "Q1 Combined Scan"
 ```
 
-## Syn Scanner
+## Syn Scan Summary
 
 Reads Nessus results from Nessus' Plugn 11219 (SYN Scanner) and creates an output summarizing the scan results. 
 
-```
+### Usage 
+
+```bash
 # Show both summaries to stdout
 python .\SynScanSummary.py .\scan.nessus
 
@@ -101,8 +103,21 @@ python .\SynScanSummary.py .\scan.nessus --csv .\syn_summary.csv
 # Write CSVs only (no stdout), both analyses -> creates syn_summary_ports_per_host.csv and syn_summary_hosts_per_port.csv
 python .\SynScanSummary.py .\scan.nessus --analysis both --csv .\syn_summary.csv --no-stdout
 ```
+### Example
 
+```bash
+SynScanSummary.py Merged.nessus --analysis hosts-per-port
+```
 
+| ![Syn Scan1](images/synScan1.png) |
+|------------------------------------|
+
+```bash
+SynScanSummary.py Merged.nessus --analysis ports-per-host
+```
+
+| ![Syn Scan2](images/synScan2.png) |
+|------------------------------------|
 ```
 
 
