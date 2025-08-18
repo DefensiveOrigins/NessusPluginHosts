@@ -4,7 +4,8 @@
 - NessusPluginHosts.py - Provides a list of hosts/services for a specific Nessus Plugin.  Multiple delimit options and search one Nessus file, or many in a directory.
 - IdentififedServices.py - Lists the services identified in a Nessus file.
 - MergeNessus.py -- Merges Nessus files from a given directory. Corrects overall start/end time & accepts change in Title.
-- 
+- SynScanSummary.py -- Summarizes SYN Scanner results from Nessus Plugin 11219. Outputs both hosts-per-port and ports-per-host analyses, with options for CSV output.
+
 ## 🧰 Requirements
 
 - Python 3.x
@@ -77,11 +78,26 @@ python3 MergeNessus.py -t "Quarterly Security Scan"
 python3 MergeNessus.py -d /scans/q1 -o ./Merged_Q1.nessus -t "Q1 Combined Scan"
 ```
 
+## Syn Scanner
 
+Reads Nessus results from Nessus' Plugn 11219 (SYN Scanner) and creates an output summarizing the scan results. 
 
+```
+# Show both summaries to stdout
+python .\SynScanSummary.py .\scan.nessus
 
+# Only ports per host, showing at most 15 ports per host
+python .\SynScanSummary.py .\scan.nessus --analysis ports-per-host --limit 15
 
+# Only hosts per port, for a specific port set, to stdout
+python .\SynScanSummary.py .\scan.nessus --analysis hosts-per-port --include-ports 22,80,443,8000-8100
 
+# Write CSV (and also print to stdout)
+python .\SynScanSummary.py .\scan.nessus --csv .\syn_summary.csv
+
+# Write CSVs only (no stdout), both analyses -> creates syn_summary_ports_per_host.csv and syn_summary_hosts_per_port.csv
+python .\SynScanSummary.py .\scan.nessus --analysis both --csv .\syn_summary.csv --no-stdout
+```
 
 
 ```
