@@ -1,5 +1,8 @@
 # Nessus Plugin Scripts:
 
+This reposity is a collection of Python scripts designed to work with Nessus scan results. The scripts utilize the built-in `xml.etree.ElementTree` library to parse `.nessus` files and provide various functionalities such as counting findings, listing hosts/services for specific plugins, identifying services, merging Nessus files, and summarizing Scanner results.
+
+## Tools Included
 - FindingCount.py - Counts findings from a nessus file.  Will count unique/total.  Can count fron one Nessus file, or many in a directory.
 - NessusPluginHosts.py - Provides a list of hosts/services for a specific Nessus Plugin.  Multiple delimit options and search one Nessus file, or many in a directory.
 - IdentififedServices.py - Lists the services identified in a Nessus file.
