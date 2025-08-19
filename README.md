@@ -4,7 +4,7 @@ This reposity is a collection of Python scripts designed to work with Nessus sca
 
 ## Tools Included
 - FindingCount.py - Counts findings from a nessus file.  Will count unique/total.  Can count fron one Nessus file, or many in a directory.
-- NessusPluginHosts.py - Provides a list of hosts/services for a specific Nessus Plugin.  Multiple delimit options and search one Nessus file, or many in a directory.
+- NessusPluginHosts.py - Provides a list of hosts/services for a specific Nessus Plugin.  Multiple delimit options and search one Nessus file, or many in a directory. Export host:port files option.
 - IdentififedServices.py - Lists the services identified in a Nessus file.
 - MergeNessus.py -- Merges Nessus files from a given directory. Corrects overall start/end time & accepts change in Title.
 - SynScanSummary.py -- Summarizes SYN Scanner results from Nessus Plugin 11219. Outputs both hosts-per-port and ports-per-host analyses, with options for CSV output.
@@ -36,23 +36,31 @@ python FindingCount.py -f <filename.nessus> --unique/--total/--both
  
 ```bash
 # Default line-delimited
-python NessusPluginHosts.py scan.nessus 19506
+python NessusPluginHosts.py -f scan.nessus 19506
 
 # Default line-delimited, no port
-python NessusPluginHosts.pyy scan.nessus 19506 --no-port
+python NessusPluginHosts.pyy -f scan.nessus 19506 --no-port
 
 # Space-delimited
-python NessusPluginHosts.py scan.nessus 19506 --space-delim
-
+python NessusPluginHosts.py -f scan.nessus 19506 --space-delim
 
 # Space-delimited, no-port -- Specfication for metasploit "rhosts"
-python NessusPluginHosts.py scan.nessus 19506 --space-delim --no-port
+python NessusPluginHosts.py -f scan.nessus 19506 --space-delim --no-port
 
 # Comma-delimited
-python NessusPluginHosts.py scan.nessus 19506 --comma-delim
+python NessusPluginHosts.py -f scan.nessus 19506 --comma-delim
 
 # Comma-delimited, no port
-python NessusPluginHosts.py scan.nessus 19506 --comma-delim --no-port
+python NessusPluginHosts.py -f scan.nessus 19506 --comma-delim --no-port
+
+# List High severity (0 = Info, 1 = Low, 2 = Med, 3 = High, 4 = Critical) finding names in terminal
+python NessusPluginHosts.py -f scan.nessus --list-plugins 3
+
+# List ALL severity finding names in terminal
+python NessusPluginHosts.py -f scan.nessus --list-plugins
+
+# Export ALL findings to nessus_plugin_hosts directory, create file for each finding with an ordered host:port list
+python NessusPluginHosts.py -f scan.nessus --list-plugins --export-plugin-hosts ./nessus_plugin_hosts
 ```
 
 ### IdentifiedServices.py (List Identified Services)
