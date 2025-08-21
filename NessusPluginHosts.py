@@ -165,17 +165,14 @@ def write_lines(path: Path, lines, space=False, comma=False):
     if not lines:
         return False
     if space:
-        text = " ".join(lines) + "
-"
+        text = " ".join(lines) + "\\n"
         path.write_text(text, encoding="utf-8")
     elif comma:
-        text = ",".join(lines) + "
-"
+        text = ",".join(lines) + "\\n"
         path.write_text(text, encoding="utf-8")
     else:
         with path.open("w", encoding="utf-8") as fh:
-            fh.writelines(l + "
-" for l in lines)
+            fh.writelines(l + "\\n" for l in lines)
     return True
 
 def main():
