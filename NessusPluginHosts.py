@@ -56,6 +56,9 @@ def sanitize_filename(name: str, max_len: int = 80) -> str:
         safe = safe[:max_len].rstrip("_")
     return safe
 
+def truthy(text: str) -> bool:
+    return bool(text) and text.strip().lower() in ("true", "yes", "1")
+
 def parse_nessus_file(filename, plugin_id, omit_ports=False):
     """Original single-plugin host listing (kept for backward compatibility)."""
     ip_results = set()
@@ -84,9 +87,10 @@ def parse_nessus_file(filename, plugin_id, omit_ports=False):
 def build_index_stream(filename, include_ports=True):
     """
     Single-pass streaming index:
-      - plugins: pid -> {name, severity_int, severity_label}
+      - plugins: pid -> {name, severity_int, severity_label, msf: bool}
       - plugin_hosts: pid -> set(host entries)
     Severity is derived from <cvss3_base_score>, falling back to <cvss_base_score> when missing.
+    MSF availability is True if <exploit_framework_metasploit> is 'true'/'yes'/'1' for any ReportItem of the plugin.
     """
     plugins = {}
     plugin_hosts = defaultdict(set)
@@ -111,17 +115,30 @@ def build_index_stream(filename, include_ports=True):
                     cvss = elem.findtext("cvss_base_score")
                 sev_int = cvss_to_sev(cvss)
 
-                # Plugin name & highest severity
+                # Metasploit availability via explicit framework flag
+                msf_flag = truthy(elem.findtext("exploit_framework_metasploit"))
+
+                # Plugin name & highest severity; merge msf flag
                 pname = (elem.attrib.get("pluginName") or "").strip()
                 existing = plugins.get(pid)
-                if (existing is None) or (sev_int > existing["severity_int"]):
+                if existing is None:
                     plugins[pid] = {
                         "name": pname,
                         "severity_int": sev_int,
                         "severity_label": severity_label_from_int(sev_int),
+                        "msf": msf_flag,
                     }
-                elif existing and not existing["name"] and pname:
-                    existing["name"] = pname  # fill name if previously blank
+                else:
+                    # Keep highest severity
+                    if sev_int > existing["severity_int"]:
+                        existing["severity_int"] = sev_int
+                        existing["severity_label"] = severity_label_from_int(sev_int)
+                    # Merge MSF (any True wins)
+                    if msf_flag:
+                        existing["msf"] = True
+                    # Fill name if previously blank
+                    if not existing.get("name") and pname:
+                        existing["name"] = pname
 
                 # Host entry
                 port = elem.attrib.get("port", "0")
@@ -148,14 +165,14 @@ def write_lines(path: Path, lines, space=False, comma=False):
     if not lines:
         return False
     if space:
-        text = " ".join(lines) + "\n"
+        text = " ".join(lines) + "\\n"
         path.write_text(text, encoding="utf-8")
     elif comma:
-        text = ",".join(lines) + "\n"
+        text = ",".join(lines) + "\\n"
         path.write_text(text, encoding="utf-8")
     else:
         with path.open("w", encoding="utf-8") as fh:
-            fh.writelines(l + "\n" for l in lines)
+            fh.writelines(l + "\\n" for l in lines)
     return True
 
 def main():
@@ -177,7 +194,7 @@ def main():
     parser.add_argument(
         "--export-plugin-hosts",
         metavar="OUTDIR",
-        help="When used with --list-plugins (optional SEVERITY), exports a host list per plugin to OUTDIR/<scan>/<Severity>/PID_[PluginName].txt"
+        help="When used with --list-plugins (optional SEVERITY), exports a host list per plugin to OUTDIR/<scan>/<Severity>/PID_[PluginName][-MSF].txt"
     )
     args = parser.parse_args()
 
@@ -214,7 +231,7 @@ def main():
             plugins, plugin_hosts = build_index_stream(file, include_ports=(not args.no_port))
 
             if args.directory and not in_export_mode:
-                print(f"\n===== Plugins in {os.path.basename(file)} =====")
+                print(f"\\n===== Plugins in {os.path.basename(file)} =====")
 
             if not plugins:
                 if not in_export_mode:
@@ -242,7 +259,8 @@ def main():
 
                 if in_export_mode:
                     sev_dir = base_scan / f"{meta['severity_int']}_{meta['severity_label']}"
-                    fname = f"{pid}_{sanitize_filename(meta['name'])}.txt"
+                    msf_suffix = "-MSF" if meta.get("msf") else ""
+                    fname = f"{pid}_{sanitize_filename(meta['name'])}{msf_suffix}.txt"
                     out_path = sev_dir / fname
 
                     # Use pre-built host set; sort for stable output
@@ -257,7 +275,7 @@ def main():
                     if written:
                         print(f"Wrote {out_path}")
                 else:
-                    name = meta["name"].replace("\n", " ").replace("\r", " ").strip()
+                    name = meta["name"].replace("\\n", " ").replace("\\r", " ").strip()
                     print(f"{pid},{meta['severity_int']},{meta['severity_label']},{name}")
         return
 
@@ -270,7 +288,7 @@ def main():
         matches = parse_nessus_file(file, args.plugin_id, args.no_port)
 
         if args.directory:
-            print(f"\n===== Results from {os.path.basename(file)} =====")
+            print(f"\\n===== Results from {os.path.basename(file)} =====")
 
         if matches:
             if args.space_delim:
@@ -278,7 +296,7 @@ def main():
             elif args.comma_delim:
                 print(",".join(matches))
             else:
-                print("\n".join(matches))
+                print("\\n".join(matches))
         else:
             print(f"No matches found for plugin ID {args.plugin_id}.")
 
