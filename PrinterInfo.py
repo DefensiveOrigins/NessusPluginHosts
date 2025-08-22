@@ -137,7 +137,7 @@ def ports_to_string(ports: Set[int], max_len: int = 40) -> str:
         return ""
     s = ",".join(str(p) for p in sorted(ports))
     if len(s) > max_len:
-        return s[: max_len - 1] + "…"
+        return s[: max_len - 1] + "..."
     return s
 
 def print_table(rows: List[Dict], ports_by_host: Dict[str, Set[int]]):
