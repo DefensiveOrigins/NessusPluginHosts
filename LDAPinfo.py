@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
 import argparse
 import csv
-import os
 import re
 import sys
 import xml.etree.ElementTree as ET
@@ -36,7 +35,7 @@ def iter_report_items(tree: ET.ElementTree):
 # ---------------------------
 
 def dn_to_domain(dn: str) -> Optional[str]:
-    """Convert a DN containing DC= components to dotted domain."""
+    """Convert a DN containing DC= components to dotted domain (e.g., DC=domain,DC=local -> domain.local)."""
     if not dn:
         return None
     dcs = re.findall(r"DC=([^,/\s]+)", dn, flags=re.I)
@@ -82,7 +81,7 @@ def extract_server_from_25701(output: str) -> Optional[str]:
     """
     Prefer [+]-serverName block, e.g.:
       [+]-serverName:
-      | CN=DomainDC01,CN=Servers,....
+      | CN=DomainDC01,CN=Servers,...
     Return the first CN value ('DomainDC01'). Fall back to serverName: lines
     or dNSHostName if present.
     """
@@ -148,12 +147,12 @@ def parse_file(file_path: Path) -> Tuple[List[Dict], List[Dict]]:
             domain = extract_domain_from_25701(plugin_output) or ""
             server = extract_server_from_25701(plugin_output) or ""
 
-            # Fallback heuristics if nothing parsed
+            # Fallback: if ReportHost is FQDN, derive domain from it
             if not domain and "." in host_name:
-                # If ReportHost name is an FQDN, derive domain from it
                 parts = host_name.split(".")
                 if len(parts) > 1:
                     domain = ".".join(parts[1:])
+
             info_25701.append({
                 "host": host_name,
                 "port": port,
@@ -164,25 +163,55 @@ def parse_file(file_path: Path) -> Tuple[List[Dict], List[Dict]]:
 
     return services_20870, info_25701
 
-def gather_inputs(f: Optional[str], d: Optional[str]) -> List[Path]:
-    paths: List[Path] = []
-    if f:
-        p = Path(f)
-        if not p.exists() or not p.is_file():
-            sys.exit(f"[!] File not found or not a file: {f}")
-        if p.suffix.lower() != ".nessus":
-            sys.exit("[!] File must have a .nessus extension.")
-        paths.append(p)
-    elif d:
-        base = Path(d)
-        if not base.exists() or not base.is_dir():
-            sys.exit(f"[!] Directory not found or not a directory: {d}")
-        paths = sorted(base.glob("*.nessus"))
-        if not paths:
-            sys.exit("[!] No .nessus files found in the directory.")
-    else:
-        sys.exit("[!] One of -f or -d is required.")
-    return paths
+# ---------------------------
+# Deduplication
+# ---------------------------
+
+def normalize_key(host: str, port: str, domain: str, server: str) -> Tuple[str, str, str, str]:
+    """
+    Normalize the dedup key so equivalent entries merge:
+    - case-insensitive domain/server
+    - port as string but trimmed
+    - host as-is (some scans use IP; others use DNS)
+    """
+    return (
+        (host or "").strip(),
+        (port or "").strip(),
+        (domain or "").strip().lower(),
+        (server or "").strip().lower(),
+    )
+
+def dedup_info_rows(rows: List[Dict]) -> List[Dict]:
+    """
+    Deduplicate by (host, port, domain, server).
+    Combine source_file values (semicolon-separated, unique, sorted).
+    """
+    bucket: Dict[Tuple[str, str, str, str], Dict] = {}
+    for r in rows:
+        key = normalize_key(r.get("host",""), r.get("port",""), r.get("domain",""), r.get("server",""))
+        sf = Path(r.get("source_file","")).name
+        if key not in bucket:
+            # store canonical-cased domain/server for display
+            bucket[key] = {
+                "host": r.get("host",""),
+                "port": r.get("port",""),
+                "domain": r.get("domain",""),
+                "server": r.get("server",""),
+                "source_files": set([sf]) if sf else set(),
+            }
+        else:
+            bucket[key]["source_files"].add(sf)
+
+    deduped: List[Dict] = []
+    for v in bucket.values():
+        deduped.append({
+            "host": v["host"],
+            "port": v["port"],
+            "domain": v["domain"],
+            "server": v["server"],
+            "source_file": ";".join(sorted(v["source_files"])) if v["source_files"] else "",
+        })
+    return deduped
 
 # ---------------------------
 # Output
@@ -231,6 +260,26 @@ def safe_int(s: str) -> int:
     except Exception:
         return 0
 
+def gather_inputs(f: Optional[str], d: Optional[str]) -> List[Path]:
+    paths: List[Path] = []
+    if f:
+        p = Path(f)
+        if not p.exists() or not p.is_file():
+            sys.exit(f"[!] File not found or not a file: {f}")
+        if p.suffix.lower() != ".nessus":
+            sys.exit("[!] File must have a .nessus extension.")
+        paths.append(p)
+    elif d:
+        base = Path(d)
+        if not base.exists() or not base.is_dir():
+            sys.exit(f"[!] Directory not found or not a directory: {d}")
+        paths = sorted(base.glob("*.nessus"))
+        if not paths:
+            sys.exit("[!] No .nessus files found in the directory.")
+    else:
+        sys.exit("[!] One of -f or -d is required.")
+    return paths
+
 def main():
     ap = argparse.ArgumentParser(
         description="Extract LDAP service (20870) and LDAP info disclosure (25701) from Nessus .nessus files."
@@ -244,12 +293,15 @@ def main():
     inputs = gather_inputs(args.file, args.directory)
 
     all_services: List[Dict] = []
-    all_info: List[Dict] = []
+    all_info_raw: List[Dict] = []
 
     for p in inputs:
         services, info = parse_file(p)
         all_services.extend(services)
-        all_info.extend(info)
+        all_info_raw.extend(info)
+
+    # Deduplicate 25701 rows across files
+    all_info = dedup_info_rows(all_info_raw)
 
     # Sort for consistent output
     all_services.sort(key=lambda x: (x["host"], safe_int(x["port"])))
