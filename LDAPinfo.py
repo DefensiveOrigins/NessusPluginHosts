@@ -5,13 +5,14 @@ import re
 import sys
 import xml.etree.ElementTree as ET
 from pathlib import Path
-from typing import Dict, List, Optional, Tuple, Set
+from typing import Dict, List, Optional, Tuple
 
-PLUGIN_PRINTERS = "11933"
-PLUGIN_SYN_SCANNER = "11219"  # Nessus SYN Scanner
+# Nessus plugin IDs of interest
+PLUGIN_LDAP_SERVICE = "20870"
+PLUGIN_LDAP_INFO = "25701"
 
 # ---------------------------
-# .nessus parsing helpers
+# Helpers for .nessus parsing
 # ---------------------------
 
 def read_nessus(file_path: Path) -> Optional[ET.ElementTree]:
@@ -30,151 +31,234 @@ def iter_report_items(tree: ET.ElementTree):
                 yield host_name, item
 
 # ---------------------------
-# Notes extraction (11933)
+# Extractors for 25701 output
 # ---------------------------
 
-NOTE_LINE_PATS = [
+def dn_to_domain(dn: str) -> Optional[str]:
+    """Convert a DN containing DC= components to dotted domain (e.g., DC=domain,DC=local -> domain.local)."""
+    if not dn:
+        return None
+    dcs = re.findall(r"DC=([^,/\s]+)", dn, flags=re.I)
+    if dcs:
+        return ".".join(d.strip() for d in dcs if d.strip())
+    return None
 
-    r"[^\r\n]+",
+def extract_domain_from_25701(output: str) -> Optional[str]:
+    """
+    Prefer [+]-namingContexts block, e.g.:
+      [+]-namingContexts:
+      | DC=domain,DC=local
+    Fallback to default/root naming contexts or any DN with DC=... in the blob.
+    """
+    if not output:
+        return None
 
-]
+    # Primary: [+]-namingContexts:
+    m = re.search(r"\[\+\]-namingContexts:\s*(?:\r?\n\|\s*)?([^\r\n]+)", output, flags=re.I)
+    if m:
+        dom = dn_to_domain(m.group(1))
+        if dom:
+            return dom
 
-def extract_notes(text: str) -> List[str]:
-    if not text:
-        return []
-    hits: List[str] = []
-    for pat in NOTE_LINE_PATS:
-        for m in re.finditer(pat, text):
-            s = m.group(0).strip()
-            if s and s not in hits:
-                hits.append(s)
-    return hits
+    # Fallbacks: defaultNamingContext or rootDomainNamingContext
+    for attr in ("defaultNamingContext", "rootDomainNamingContext"):
+        m2 = re.search(rf"{attr}\s*[:=]\s*([^\r\n]+)", output, flags=re.I)
+        if m2:
+            dom = dn_to_domain(m2.group(1))
+            if dom:
+                return dom
+
+    # Last resort: first DN-like sequence with DC=... in the blob
+    m3 = re.search(r"(DC=[^,\r\n]+(?:\s*,\s*DC=[^,\r\n]+)+)", output, flags=re.I)
+    if m3:
+        dom = dn_to_domain(m3.group(0))
+        if dom:
+            return dom
+
+    return None
+
+def extract_server_from_25701(output: str) -> Optional[str]:
+    """
+    Prefer [+]-serverName block, e.g.:
+      [+]-serverName:
+      | CN=DomainDC01,CN=Servers,...
+    Return the first CN value ('DomainDC01'). Fall back to serverName: lines
+    or dNSHostName if present.
+    """
+    if not output:
+        return None
+
+    # Primary: [+]-serverName:
+    m = re.search(r"\[\+\]-serverName:\s*(?:\r?\n\|\s*)?([^\r\n]+)", output, flags=re.I)
+    if m:
+        dn = m.group(1).strip()
+        cn = re.search(r"CN=([^,]+)", dn, flags=re.I)
+        return cn.group(1).strip() if cn else dn
+
+    # Fallback: serverName: <dn>
+    m2 = re.search(r"serverName\s*[:=]\s*([^\r\n]+)", output, flags=re.I)
+    if m2:
+        dn = m2.group(1).strip()
+        cn = re.search(r"CN=([^,]+)", dn, flags=re.I)
+        return cn.group(1).strip() if cn else dn
+
+    # Fallback: dNSHostName: fqdn
+    m3 = re.search(r"dNSHostName\s*[:=]\s*([^\r\n]+)", output, flags=re.I)
+    if m3:
+        return m3.group(1).strip()
+
+    return None
 
 # ---------------------------
 # File-level processing
 # ---------------------------
 
-def parse_file(file_path: Path) -> Tuple[List[Dict], Dict[str, Set[int]]]:
+def parse_file(file_path: Path) -> Tuple[List[Dict], List[Dict]]:
     """
     Returns:
-      rows: [{host, notes, source_file}, ...]   from plugin 11933
-      ports_by_host: {host: set(int ports)}     from plugin 11219
+      services_20870: list of {host, port, protocol, svc_name, plugin_output_present, source_file}
+      info_25701: list of {host, port, domain, server, source_file}
     """
-    rows: List[Dict] = []
-    ports_by_host: Dict[str, Set[int]] = {}
+    services_20870: List[Dict] = []
+    info_25701: List[Dict] = []
 
     tree = read_nessus(file_path)
     if not tree:
-        return rows, ports_by_host
+        return services_20870, info_25701
 
     for host_name, item in iter_report_items(tree):
         plugin_id = item.get("pluginID", "")
+        port = item.get("port", "") or item.get("portnum", "")
+        protocol = item.get("protocol", "") or item.get("svc_name", "")
+        svc_name = item.get("svc_name", "")
+        plugin_output = item.findtext("plugin_output") or ""
 
-        # Collect SYN scanner ports (11219)
-        if plugin_id == PLUGIN_SYN_SCANNER:
-            port_str = item.get("port", "") or item.get("portnum", "")
-            proto = (item.get("protocol", "") or "").lower()
-            if proto in ("", "tcp"):  # SYN scanner is TCP; be tolerant
-                try:
-                    port = int(port_str)
-                    if port > 0:
-                        ports_by_host.setdefault(host_name, set()).add(port)
-                except Exception:
-                    pass  # ignore unparsable ports
+        if plugin_id == PLUGIN_LDAP_SERVICE:
+            services_20870.append({
+                "host": host_name,
+                "port": port,
+                "protocol": protocol,
+                "svc_name": svc_name,
+                "plugin_output_present": bool(plugin_output.strip()),
+                "source_file": str(file_path),
+            })
 
-        # Collect printer notes (11933)
-        if plugin_id == PLUGIN_PRINTERS:
-            plugin_output = item.findtext("plugin_output") or ""
-            notes = extract_notes(plugin_output)
-            if not notes:
-                notes = ["Printer detected (11933)"]
-            for note in notes:
-                rows.append({
-                    "host": host_name,
-                    "notes": note,
-                    "source_file": str(file_path),
-                })
+        elif plugin_id == PLUGIN_LDAP_INFO:
+            domain = extract_domain_from_25701(plugin_output) or ""
+            server = extract_server_from_25701(plugin_output) or ""
 
-    return rows, ports_by_host
+            # Fallback: if ReportHost is FQDN, derive domain from it
+            if not domain and "." in host_name:
+                parts = host_name.split(".")
+                if len(parts) > 1:
+                    domain = ".".join(parts[1:])
+
+            info_25701.append({
+                "host": host_name,
+                "port": port,
+                "domain": domain,
+                "server": server,
+                "source_file": str(file_path),
+            })
+
+    return services_20870, info_25701
 
 # ---------------------------
 # Deduplication
 # ---------------------------
 
-def dedup_rows(rows: List[Dict]) -> List[Dict]:
+def normalize_key(host: str, port: str, domain: str, server: str) -> Tuple[str, str, str, str]:
     """
-    Deduplicate by (host, notes). Merge source_file names (semicolon-separated).
+    Normalize the dedup key so equivalent entries merge:
+    - case-insensitive domain/server
+    - port as string but trimmed
+    - host as-is (some scans use IP; others use DNS)
     """
-    bucket: Dict[Tuple[str, str], Dict] = {}
+    return (
+        (host or "").strip(),
+        (port or "").strip(),
+        (domain or "").strip().lower(),
+        (server or "").strip().lower(),
+    )
+
+def dedup_info_rows(rows: List[Dict]) -> List[Dict]:
+    """
+    Deduplicate by (host, port, domain, server).
+    Combine source_file values (semicolon-separated, unique, sorted).
+    """
+    bucket: Dict[Tuple[str, str, str, str], Dict] = {}
     for r in rows:
-        host = (r.get("host") or "").strip()
-        note = (r.get("notes") or "").strip()
-        key = (host, note)
-        sf = Path(r.get("source_file", "")).name
+        key = normalize_key(r.get("host",""), r.get("port",""), r.get("domain",""), r.get("server",""))
+        sf = Path(r.get("source_file","")).name
         if key not in bucket:
-            bucket[key] = {"host": host, "notes": note, "source_files": set()}
-        if sf:
+            # store canonical-cased domain/server for display
+            bucket[key] = {
+                "host": r.get("host",""),
+                "port": r.get("port",""),
+                "domain": r.get("domain",""),
+                "server": r.get("server",""),
+                "source_files": set([sf]) if sf else set(),
+            }
+        else:
             bucket[key]["source_files"].add(sf)
 
-    out: List[Dict] = []
+    deduped: List[Dict] = []
     for v in bucket.values():
-        out.append({
+        deduped.append({
             "host": v["host"],
-            "notes": v["notes"],
+            "port": v["port"],
+            "domain": v["domain"],
+            "server": v["server"],
             "source_file": ";".join(sorted(v["source_files"])) if v["source_files"] else "",
         })
-    return out
+    return deduped
 
 # ---------------------------
 # Output
 # ---------------------------
 
-def ports_to_string(ports: Set[int], max_len: int = 40) -> str:
-    if not ports:
-        return ""
-    s = ",".join(str(p) for p in sorted(ports))
-    if len(s) > max_len:
-        return s[: max_len - 1] + "…"
-    return s
-
-def print_table(rows: List[Dict], ports_by_host: Dict[str, Set[int]]):
-    if not rows:
-        print("\n[Printers Identified] (plugin 11933): none found")
+def print_services(services: List[Dict]):
+    if not services:
+        print("\n[LDAP Services Identified] (plugin 20870): none found")
         return
-    print("\n[Printers Identified] (plugin 11933)")
-    print("-" * 132)
-    print(f"{'Host':<28} {'OpenTCP':<20} {'Notes':<80}")
-    print("-" * 132)
-    for r in rows:
-        open_tcp = ports_to_string(ports_by_host.get(r["host"], set()), max_len=20)
-        notes = r["notes"]
-        # Fit notes to remaining width
-        if len(notes) > 80:
-            notes = notes[:78] + "…"
-        print(f"{r['host']:<28} {open_tcp:<20} {notes:<80}")
-    print("-" * 132)
+    print("\n[LDAP Services Identified] (plugin 20870)")
+    print("-" * 72)
+    print(f"{'Host':<30} {'Port':<6} {'Proto':<6} {'Service':<10} Source")
+    print("-" * 72)
+    for s in services:
+        source_name = Path(s['source_file']).name
+        print(f"{s['host']:<30} {s['port']:<6} {s['protocol']:<6} {s['svc_name']:<10} {source_name}")
+    print("-" * 72)
 
-def write_csv(rows: List[Dict], ports_by_host: Dict[str, Set[int]], out_path: Path):
+def print_table(rows: List[Dict]):
+    if not rows:
+        print("\n[LDAP Information Disclosure] (plugin 25701): none found")
+        return
+    print("\n[LDAP Information Disclosure] (plugin 25701)")
+    print("-" * 110)
+    print(f"{'Host':<30} {'Port':<6} {'Domain':<30} {'Server':<30}")
+    print("-" * 110)
+    for r in rows:
+        print(f"{r['host']:<30} {r['port']:<6} {r['domain']:<30} {r['server']:<30}")
+    print("-" * 110)
+
+def write_csv(rows: List[Dict], out_path: Path):
     with out_path.open("w", newline="", encoding="utf-8") as f:
-        writer = csv.DictWriter(
-            f,
-            fieldnames=["host","open_tcp","notes","source_file"]
-        )
+        writer = csv.DictWriter(f, fieldnames=["host", "port", "domain", "server", "source_file"])
         writer.writeheader()
         if rows:
-            for r in rows:
-                open_tcp = ",".join(str(p) for p in sorted(ports_by_host.get(r["host"], set())))
-                writer.writerow({
-                    "host": r["host"],
-                    "open_tcp": open_tcp,
-                    "notes": r["notes"],
-                    "source_file": r["source_file"],
-                })
+            writer.writerows(rows)
     print(f"[+] Wrote CSV: {out_path}")
 
 # ---------------------------
 # Main
 # ---------------------------
+
+def safe_int(s: str) -> int:
+    try:
+        return int(s)
+    except Exception:
+        return 0
 
 def gather_inputs(f: Optional[str], d: Optional[str]) -> List[Path]:
     paths: List[Path] = []
@@ -198,33 +282,36 @@ def gather_inputs(f: Optional[str], d: Optional[str]) -> List[Path]:
 
 def main():
     ap = argparse.ArgumentParser(
-        description="Extract identified printers (plugin 11933) and SYN scanner open TCP ports (plugin 11219) from Nessus .nessus files."
+        description="Extract LDAP service (20870) and LDAP info disclosure (25701) from Nessus .nessus files."
     )
     mx = ap.add_mutually_exclusive_group(required=True)
     mx.add_argument("-f", "--file", help="Single .nessus file")
     mx.add_argument("-d", "--directory", help="Directory containing .nessus files")
-    ap.add_argument("--csv", help="Output CSV path (default: ./printers.csv)", default="printers.csv")
+    ap.add_argument("--csv", help="Output CSV path for 25701 table (default: ./ldap_info.csv)", default="ldap_info.csv")
     args = ap.parse_args()
 
     inputs = gather_inputs(args.file, args.directory)
 
-    all_rows_raw: List[Dict] = []
-    all_ports: Dict[str, Set[int]] = {}
+    all_services: List[Dict] = []
+    all_info_raw: List[Dict] = []
 
     for p in inputs:
-        rows, ports_by_host = parse_file(p)
-        all_rows_raw.extend(rows)
-        # merge ports per host across files
-        for h, s in ports_by_host.items():
-            all_ports.setdefault(h, set()).update(s)
+        services, info = parse_file(p)
+        all_services.extend(services)
+        all_info_raw.extend(info)
 
-    rows = dedup_rows(all_rows_raw)
+    # Deduplicate 25701 rows across files
+    all_info = dedup_info_rows(all_info_raw)
 
     # Sort for consistent output
-    rows.sort(key=lambda x: (x["host"].lower(), x["notes"].lower()))
+    all_services.sort(key=lambda x: (x["host"], safe_int(x["port"])))
+    all_info.sort(key=lambda x: (x["host"], safe_int(x["port"])))
 
-    print_table(rows, all_ports)
-    write_csv(rows, all_ports, Path(args.csv).resolve())
+    print_services(all_services)
+    print_table(all_info)
+
+    out_csv = Path(args.csv).resolve()
+    write_csv(all_info, out_csv)
 
 if __name__ == "__main__":
     main()
