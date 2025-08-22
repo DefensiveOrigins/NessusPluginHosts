@@ -34,9 +34,12 @@ def iter_report_items(tree: ET.ElementTree):
 # ---------------------------
 
 NOTE_LINE_PATS = [
-
-    r"[^\r\n]+"
-
+    # Keep everything on each line (your pattern kept every line);
+    # you can tighten with specific phrases if you want to filter.
+    r"[^\r\n]+",
+    # Examples you mentioned earlier (kept implicitly by the line-catch-all above):
+    # r"(?i)\bSNMP reports it as[^\r\n]*",
+    # r"(?i)\bA PJL service is listening on port\s+\d+[^\r\n]*",
 ]
 
 def extract_notes(text: str) -> List[str]:
