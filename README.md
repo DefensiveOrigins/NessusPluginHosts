@@ -9,6 +9,7 @@ This reposity is a collection of Python scripts designed to work with Nessus sca
 - MergeNessus.py -- Merges Nessus files from a given directory. Corrects overall start/end time & accepts change in Title.
 - SynScanSummary.py -- Summarizes SYN Scanner results from Nessus Plugin 11219. Outputs both hosts-per-port and ports-per-host analyses, with options for CSV output.
 - LDAPinfo.py - Parses LDAP information from Nessus plugins 20870 and 25701, providing a structured output of LDAP services and information disclosure. Identifies domain name and server name.
+- PrinterInfo.py - Parses Printer information including vendor/model if identified and open TCP ports
 
 ## 🧰 Requirements
 
