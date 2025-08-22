@@ -153,7 +153,7 @@ def print_table(rows: List[Dict], ports_by_host: Dict[str, Set[int]]):
         notes = r["notes"]
         # Fit notes to remaining width
         if len(notes) > 80:
-            notes = notes[:78] + "…"
+            notes = notes[:78] + "..."
         print(f"{r['host']:<28} {open_tcp:<20} {notes:<80}")
     print("-" * 132)
 
