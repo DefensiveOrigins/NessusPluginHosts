@@ -8,6 +8,7 @@ This reposity is a collection of Python scripts designed to work with Nessus sca
 - IdentififedServices.py - Lists the services identified in a Nessus file.
 - MergeNessus.py -- Merges Nessus files from a given directory. Corrects overall start/end time & accepts change in Title.
 - SynScanSummary.py -- Summarizes SYN Scanner results from Nessus Plugin 11219. Outputs both hosts-per-port and ports-per-host analyses, with options for CSV output.
+- LDAPinfo.py - Parses LDAP information from Nessus plugins 20870 and 25701, providing a structured output of LDAP services and information disclosure. Identifies domain name and server name.
 
 ## 🧰 Requirements
 
@@ -129,4 +130,41 @@ SynScanSummary.py Merged.nessus --analysis ports-per-host
 ```
 
 
+## LDAPinfo.py (LDAP Information Gathering)
 
+This script parses the details from plugins 20870 and 25701 and returns the information in a easy to read format.  No more hunting the nessus file when you just quickly need the LDAP information.
+
+### Usage
+```bash
+# Parse a single Nessus file 
+python3 LDAPinfo.py -f scan.nessus
+
+# Parse all Nessus files in a directory
+python3 LDAPinfo.py -d /path/to/nessus/files
+
+# Output to a specific CSV file (for paste into Excel/word)
+python3 LDAPinfo.py -f scan.nessus --csv /tmp/ldap_info.csv
+```
+
+### Example Output
+```
+# $ python3 LDAPinfo.py -d /path/to/nessus/files
+
+[LDAP Services Identified] (plugin 20870)
+------------------------------------------------------------------------
+Host                           Port   Proto  Service    Source
+------------------------------------------------------------------------
+192.168.1.10                   389    tcp    ldap       corp_scan1.nessus
+192.168.1.11                   636    tcp    ldaps      corp_scan2.nessus
+------------------------------------------------------------------------
+
+[LDAP Information Disclosure] (plugin 25701)
+--------------------------------------------------------------------------------------------------------------
+Host                           Port   Domain                        Server
+--------------------------------------------------------------------------------------------------------------
+192.168.1.10                   389    domain.local                  DomainDC01
+192.168.1.11                   636    domain.local                  DomainDC02
+--------------------------------------------------------------------------------------------------------------
+
+[+] Wrote CSV: /current/dir/ldap_info.csv
+```
