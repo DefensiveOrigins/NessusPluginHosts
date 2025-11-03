@@ -11,6 +11,7 @@ This reposity is a collection of Python scripts designed to work with Nessus sca
 - LDAPinfo.py - Parses LDAP information from Nessus plugins 20870 and 25701, providing a structured output of LDAP services and information disclosure. Identifies domain name and server name.
 - PrinterInfo.py - Parses Printer information including vendor/model if identified and open TCP ports
  - RemoveHost.py - Removes a specified host from a Nessus File.
+ - HostInfo.py - Parses host information, provides scan timing, alternate hostnames, fqdns, and lists indicated plugins+services for a specific host (hostname or ip)
 
 ## 🧰 Requirements
 
@@ -90,6 +91,16 @@ python3 MergeNessus.py -t "Quarterly Security Scan"
 
 # Merge from a directory, set both custom title and output file:
 python3 MergeNessus.py -d /scans/q1 -o ./Merged_Q1.nessus -t "Q1 Combined Scan"
+```
+
+### HostInfo.py (Provide Host Details)
+
+Provides details about a host, alternate hostnames, scanning times, etc.
+
+```bash
+python3 HostInfo.py -f input.nessus -n 192.168.1.1
+
+python3 HostInfo.py -d ./nessusDirectory/ -n 192.168.1.1
 ```
 
 ### RemoveHost.py (Remove Host from Nessus File)
