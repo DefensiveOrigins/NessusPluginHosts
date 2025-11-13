@@ -287,7 +287,10 @@ def main():
         matches = parse_nessus_file(file, args.plugin_id, args.no_port)
 
         if args.directory:
-            print(f"\n===== Results from {os.path.basename(file)} =====")
+            count = len(matches)
+            # choose label based on whether ports are included
+            label = "nodes" if args.no_port else "nodes/ports"
+            print(f"\n===== Results from {os.path.basename(file)} ({count} {label}) =====")
 
         if matches:
             if args.space_delim:
