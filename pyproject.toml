@@ -14,10 +14,6 @@ authors = [
 maintainers = [
   { name = "Defensive Origins", email = "info@defensiveorigins.com" }
 ]
-license = { text = "Proprietary" }
-# ^^^ Change this to your actual license policy.
-# If you add a LICENSE file, use instead:
-# license = { file = "LICENSE" }
 
 keywords = [
   "nessus",
