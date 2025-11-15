@@ -4,7 +4,7 @@ This repo is a collection of Python scripts designed to work with Nessus scan re
 
 ## istallation
 
-With pip: 
+With PIP: 
 
 ```bash
 pip install nessus-plugin-hosts
