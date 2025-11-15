@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 MergeNessus.py
-Merge multiple .nessus files into a single .nessus file.
+Merge multiple .nessus files into a single .nessus file cleanly.
 
 Features:
 - Uses argparse for CLI options.
