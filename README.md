@@ -113,7 +113,7 @@ python3 MergeNessus.py -t "Quarterly Security Scan"
 python3 MergeNessus.py -d /scans/q1 -o ./Merged_Q1.nessus -t "Q1 Combined Scan"
 ```
 
-### HostInfo.py (Provide Host Details)
+### HostInfo.py / nessus-host-info (Provide Host Details)
 
 Provides details about a host, alternate hostnames, scanning times, etc.
 
@@ -123,7 +123,7 @@ python3 HostInfo.py -f input.nessus -n 192.168.1.1
 python3 HostInfo.py -d ./nessusDirectory/ -n 192.168.1.1
 ```
 
-### RemoveHost.py (Remove Host from Nessus File)
+### RemoveHost.py / nessus-remove-host (Remove Host from Nessus File)
 ```bash
 python3 RemoveHost.py -f input.nessus -o output.nessus -n target-hostname
 ```
