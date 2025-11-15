@@ -57,18 +57,42 @@ jobs:
               f.write(f"new_version={new_version}\n")
           PY
 
-      - name: Commit updated version
+      - name: Commit updated version on Publish
         run: |
           git config user.name "github-actions"
           git config user.email "actions@github.com"
           git add pyproject.toml
 
-          # avoid failure if nothing changed for some reason
           if git diff --cached --quiet; then
-            echo "No version change to commit."
+            echo "No version change to commit on Publish."
           else
             git commit -m "Auto-bump version to ${{ steps.bump.outputs.new_version }}"
-            git push
+            git push origin HEAD:Publish
+          fi
+
+      - name: Sync pyproject.toml to main
+        # Only run if we actually bumped/committed something
+        run: |
+          VERSION="${{ steps.bump.outputs.new_version }}"
+          echo "Syncing version $VERSION to main branch"
+
+          # Make sure we have the latest branches
+          git fetch origin
+
+          # Switch to main and pull latest
+          git checkout main
+          git pull origin main
+
+          # Bring over the bumped pyproject.toml from Publish
+          git checkout Publish -- pyproject.toml
+
+          # Stage and commit if there is a change
+          if git diff --cached --quiet; then
+            echo "No changes to commit on main."
+          else
+            git add pyproject.toml
+            git commit -m "Sync version to ${VERSION} from Publish"
+            git push origin main
           fi
 
       - name: Build distributions
