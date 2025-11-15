@@ -1,0 +1,88 @@
+[build-system]
+requires = ["setuptools>=61", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "nessus-plugin-hosts"
+version = "0.1.0"
+description = "A collection of Python CLI tools for parsing and summarizing Nessus .nessus scan results."
+readme = "README.md"
+requires-python = ">=3.8"
+authors = [
+  { name = "Defensive Origins", email = "info@defensiveorigins.com" }
+]
+maintainers = [
+  { name = "Defensive Origins", email = "info@defensiveorigins.com" }
+]
+license = { text = "Proprietary" }
+# ^^^ Change this to your actual license policy.
+# If you add a LICENSE file, use instead:
+# license = { file = "LICENSE" }
+
+keywords = [
+  "nessus",
+  "vulnerability-scanning",
+  "security",
+  "reporting",
+  "xml",
+  "cli",
+]
+
+classifiers = [
+  "Development Status :: 4 - Beta",
+  "Intended Audience :: Information Technology",
+  "Intended Audience :: System Administrators",
+  "License :: OSI Approved :: MIT License",
+  # ^^^ Adjust to your actual license or remove if you're not using MIT.
+  "Programming Language :: Python",
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3 :: Only",
+  "Programming Language :: Python :: 3.8",
+  "Programming Language :: Python :: 3.9",
+  "Programming Language :: Python :: 3.10",
+  "Programming Language :: Python :: 3.11",
+  "Environment :: Console",
+  "Topic :: Security",
+  "Topic :: System :: Networking",
+  "Topic :: Utilities",
+]
+
+dependencies = [
+  # Currently no non-stdlib dependencies.
+]
+
+[project.urls]
+Homepage = "https://github.com/DefensiveOrigins/NessusPluginHosts"
+Repository = "https://github.com/DefensiveOrigins/NessusPluginHosts"
+Issues = "https://github.com/DefensiveOrigins/NessusPluginHosts/issues"
+
+[project.scripts]
+nessus-finding-count = "FindingCount:main"
+nessus-plugin-hosts = "NessusPluginHosts:main"
+nessus-identified-services = "IdentifiedServices:main"
+nessus-merge = "MergeNessus:main"
+nessus-synscan-summary = "SynScanSummary:main"
+nessus-ldap-info = "LDAPinfo:main"
+nessus-printer-info = "PrinterInfo:main"
+nessus-remove-host = "RemoveHost:main"
+nessus-host-info = "HostInfo:main"
+
+[tool.setuptools]
+# Tell setuptools these are plain modules (not a package dir).
+py-modules = [
+  "FindingCount",
+  "NessusPluginHosts",
+  "IdentifiedServices",
+  "MergeNessus",
+  "SynScanSummary",
+  "LDAPinfo",
+  "PrinterInfo",
+  "RemoveHost",
+  "HostInfo",
+]
+
+# Optional: include the images directory in sdist if you want
+[tool.setuptools.package-data]
+# There is no package dir, so this is mostly for sdist; you can drop this
+# or adjust if you later introduce a real package directory.
+# "nessus_plugin_hosts" = ["images/*"]
