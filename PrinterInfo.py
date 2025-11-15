@@ -129,7 +129,7 @@ def dedup_rows(rows: List[Dict]) -> List[Dict]:
     return out
 
 # ---------------------------
-# Output
+# Output  Section
 # ---------------------------
 
 def ports_to_string(ports: Set[int], max_len: int = 40) -> str:
