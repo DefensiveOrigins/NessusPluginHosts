@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "nessus-plugin-hosts"
-version = "0.1.2"
+version = "1.0.0"
 description = "A collection of Python CLI tools for parsing and summarizing Nessus .nessus scan results."
 readme = "README.md"
 requires-python = ">=3.8"
@@ -15,9 +15,39 @@ dependencies = []
 name = "Defensive Origins"
 email = "info@defensiveorigins.com"
 
-[[project.maintainers]]
-name = "Defensive Origins"
-email = "info@defensiveorigins.com"
+keywords = [
+  "nessus",
+  "vulnerability-scanning",
+  "pentesting",
+  "cybersecurity",
+  "network-security",
+  "security",
+  "reporting",
+  "xml",
+  "cli",
+]
+
+classifiers = [
+  "Development Status :: 4 - Beta",
+  "Intended Audience :: Information Technology",
+  "Intended Audience :: System Administrators",
+  "License :: OSI Approved :: MIT License",
+  "Programming Language :: Python",
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3 :: Only",
+  "Programming Language :: Python :: 3.8",
+  "Programming Language :: Python :: 3.9",
+  "Programming Language :: Python :: 3.10",
+  "Programming Language :: Python :: 3.11",
+  "Environment :: Console",
+  "Topic :: Security",
+  "Topic :: System :: Networking",
+  "Topic :: Utilities",
+]
+
+dependencies = [
+  # Currently no non-stdlib dependencies.
+]
 
 [project.urls]
 Homepage = "https://github.com/DefensiveOrigins/NessusPluginHosts"

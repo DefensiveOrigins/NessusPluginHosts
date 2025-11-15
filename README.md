@@ -1,6 +1,6 @@
 # Nessus Plugin Scripts:
 
-This reposity is a collection of Python scripts designed to work with Nessus scan results. The scripts utilize the built-in `xml.etree.ElementTree` library to parse `.nessus` files and provide various functionalities such as counting findings, listing hosts/services for specific plugins, identifying services, merging Nessus files, and summarizing Scanner results.
+This repo is a collection of Python scripts designed to work with Nessus scan results. The scripts utilize the built-in `xml.etree.ElementTree` library to parse `.nessus` files and provide various functionalities such as counting findings, listing hosts/services for specific plugins, identifying services, merging Nessus files, and summarizing Scanner results.
 
 ## istallation
 
@@ -11,8 +11,8 @@ pip install nessus-plugin-hosts
 ```
 
 
-
 With Git: 
+
 ```bash
 git clone https://github.com/DefensiveOrigins/NessusPluginHosts
 cd NessusPluginHosts
@@ -130,7 +130,7 @@ python3 RemoveHost.py -f input.nessus -o output.nessus -n target-hostname
 
 ## SynScanSummary.py / nessus-synscan-summarySummary
 
-Reads Nessus results from Nessus' Plugn 11219 (SYN Scanner) and creates an output summarizing the scan results. 
+Reads Nessus results from Nessus' Plugin 11219 (SYN Scanner) and creates an output summarizing the scan results. 
 
 ### Usage 
 
@@ -170,7 +170,7 @@ SynScanSummary.py Merged.nessus --analysis ports-per-host
 
 ## LDAPinfo.py / nessus-ldap-info (LDAP Information Gathering)
 
-This script parses the details from plugins 20870 and 25701 and returns the information in a easy to read format.  No more hunting the nessus file when you just quickly need the LDAP information.
+This script parses the details from plugins 20870 and 25701 and returns the information in a easy to read format.  No more hunting the Nessus file when you just quickly need the LDAP information.
 
 ### Usage
 ```bash
