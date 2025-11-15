@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "nessus-plugin-hosts"
-version = "0.1.1"
+version = "1.0.0"
 description = "A collection of Python CLI tools for parsing and summarizing Nessus .nessus scan results."
 readme = "README.md"
 requires-python = ">=3.8"
@@ -18,6 +18,9 @@ maintainers = [
 keywords = [
   "nessus",
   "vulnerability-scanning",
+  "pentesting",
+  "cybersecurity",
+  "network-security",
   "security",
   "reporting",
   "xml",
